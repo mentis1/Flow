@@ -20,10 +20,6 @@
   --accent-hover:#1a6fc4;
   --accent-soft: rgba(35,131,226,.10);
 
-  --green:  #0f9d58;
-  --orange: #e8813a;
-  --red:    #e03e3e;
-  --yellow: #dfab01;
   --purple: #9065b0;
 
   --text-1: #191918;
@@ -236,7 +232,7 @@ img, svg { display: block; }
 .project-tile-progress-fill {
   height: 100%;
   border-radius: 999px;
-  background: var(--accent);
+  background: var(--text-1) !important;
   transition: width .4s ease;
 }
 
@@ -328,7 +324,7 @@ img, svg { display: block; }
   transition: background var(--transition), color var(--transition);
 }
 .btn-icon-action:hover { background: var(--bg-hover); color: var(--text-1); }
-.btn-icon-action.btn-danger:hover { background: rgba(224,62,62,.08); color: var(--red); }
+.btn-icon-action.btn-danger:hover { background: rgba(224,62,62,.08); color: #e03e3e; }
 
 /* ── Progress ──────────────────────────────────────────── */
 .progress-section {
@@ -351,8 +347,8 @@ img, svg { display: block; }
   position: absolute;
   left: 0; top: 0; bottom: 0;
   border-radius: 999px;
-  background: var(--accent);
-  transition: width .3s ease, background-image .3s ease;
+  background: var(--text-1) !important;
+  transition: width .3s ease;
 }
 .progress-slider {
   position: absolute;
@@ -368,15 +364,15 @@ img, svg { display: block; }
   width: 16px; height: 16px;
   border-radius: 50%;
   border: 0;
-  background: var(--accent);
-  box-shadow: 0 1px 6px rgba(35,131,226,.35);
+  background: #191918;
+  box-shadow: 0 1px 4px rgba(0,0,0,.25);
   -webkit-appearance: none;
 }
 .progress-slider::-moz-range-thumb {
   width: 16px; height: 16px;
   border-radius: 50%;
   border: 0;
-  background: var(--accent);
+  background: #191918;
 }
 .progress-value { font-size: 12px; font-weight: 600; color: var(--text-2); min-width: 36px; text-align: right; }
 
@@ -527,7 +523,7 @@ img, svg { display: block; }
 .step-row:hover .step-delete,
 .tomorrow-row:hover .tomorrow-delete { opacity: 1; }
 .step-delete:hover, .tomorrow-delete:hover {
-  color: var(--red);
+  color: #e03e3e;
   background: rgba(224,62,62,.08);
 }
 
