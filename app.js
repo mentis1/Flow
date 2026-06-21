@@ -39,7 +39,7 @@ const db          = getFirestore(firebaseApp);
 
 // ── Constantes ───────────────────────────────────────────────
 const COLORS        = ['#ff3b30','#ff9500','#ffcc00','#34c759','#007aff','#5856d6','#af52de','#ff2d55','#636366'];
-const EMOJIS_DEFAULT = ['🚀','💡','📊','🎯','🛠','📱','💼','🌟','🔥'];
+const EMOJIS_DEFAULT = ['🚀','💡','📊','🎯','💻','📚','💼','📹','🔥'];
 
 // ── Estado ───────────────────────────────────────────────────
 const state = {
