@@ -3,146 +3,137 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Flow — Gestor de proyectos</title>
-
-  <!-- ── Favicon (pestaña del navegador) ── -->
-  <link rel="icon" type="image/png" sizes="512x512" href="icon.png" />
-  <link rel="shortcut icon" href="icon.png" />
-
-  <!-- ── Apple Touch Icon (acceso directo iPad/iPhone) ── -->
-  <link rel="apple-touch-icon" sizes="512x512" href="icon.png" />
-
-  <!-- ── PWA / Web App Manifest ── -->
-  <link rel="manifest" href="manifest.json" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="Flow" />
-  <meta name="theme-color" content="#ffffff" />
-
+  <title>Flow</title>
   <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="icon.png" />
+<link rel="apple-touch-icon" href="icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Flow" />
 </head>
 <body>
-  <div class="shell">
 
-    <!-- ── Sidebar ── -->
-    <aside class="sidebar">
-      <div class="sidebar-brand">
-        <div class="brand-icon">
-          <img src="icon.png" alt="Flow icon" width="28" height="28" style="border-radius:7px;display:block;" />
-        </div>
+  <!-- ── LOGIN VIEW ───────────────────────────────────────── -->
+  <div id="loginView" class="login-overlay hidden">
+    <div class="login-card">
+      <div class="login-brand">
+        <img src="icon.png" alt="Flow" style="width:24px;height:24px;border-radius:4px;display:block;" />
         <span class="brand-name">Flow</span>
       </div>
+      <h2 class="login-title">Bienvenido</h2>
+      <p class="login-subtitle">Inicia sesión para acceder a tus proyectos</p>
 
+      <div id="loginError" class="login-error hidden"></div>
+
+      <form id="loginForm" class="login-form" autocomplete="on">
+        <label>
+          <span>Correo electrónico</span>
+          <input type="email" id="loginEmail" placeholder="tu@email.com" required />
+        </label>
+        <label>
+          <span>Contraseña</span>
+          <input type="password" id="loginPassword" placeholder="••••••••" required />
+        </label>
+        <button type="submit" class="btn-primary btn-full" id="loginBtn">Iniciar sesión</button>
+      </form>
+
+      <div class="login-divider"><span>o</span></div>
+
+      <form id="registerForm" class="login-form hidden" autocomplete="on">
+        <label>
+          <span>Correo electrónico</span>
+          <input type="email" id="registerEmail" placeholder="tu@email.com" required />
+        </label>
+        <label>
+          <span>Contraseña</span>
+          <input type="password" id="registerPassword" placeholder="Mínimo 6 caracteres" required />
+        </label>
+        <button type="submit" class="btn-primary btn-full" id="registerBtn">Crear cuenta</button>
+      </form>
+
+      <div class="login-toggle">
+        <span id="toggleLoginText">¿No tienes cuenta?</span>
+        <button id="toggleLoginBtn" class="btn-link">Crear cuenta</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── APP SHELL ─────────────────────────────────────────── -->
+  <div id="appShell" class="shell hidden">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+      <img src="icon.png" alt="Flow" style="width:24px;height:24px;border-radius:4px;display:block;" />
+        <span class="brand-name">Flow</span>
+      </div>
       <nav class="sidebar-nav">
         <button class="nav-item active" data-section="dashboard">
-          <span class="nav-icon">⊞</span> Inicio
+          <span class="nav-icon">⊞</span> Proyectos
         </button>
       </nav>
-
-      <div class="sidebar-section-label">Proyectos</div>
-      <div id="sidebarProjects"></div>
-
-      <button class="sidebar-add" id="btnNewProjectSidebar">
-        <span style="font-size:15px; margin-right:6px; opacity:.6">＋</span> Nuevo proyecto
+      <div class="sidebar-section-label">Mis proyectos</div>
+      <nav id="sidebarProjects"></nav>
+      <button class="sidebar-add" id="sidebarAddBtn">
+        <span style="font-size:15px;margin-right:6px">+</span> Nuevo proyecto
+      </button>
+      <button class="sidebar-logout" id="logoutBtn" title="Cerrar sesión">
+        <span class="nav-icon">↩</span> Cerrar sesión
       </button>
     </aside>
 
-    <!-- ── Contenido ── -->
-    <main class="content">
-
+    <!-- Content -->
+    <main class="content" id="content">
       <!-- Dashboard -->
-      <section id="viewDashboard">
-        <h1 class="view-title">Mis proyectos</h1>
-        <p class="view-subtitle" id="dashSubtitle"></p>
-        <div id="projectGrid" class="project-grid"></div>
-        <div class="fab-wrap">
-          <button class="fab" id="btnNewProject" title="Nuevo proyecto">
-            <svg width="18" height="18" viewBox="0 0 22 22" fill="none">
-              <path d="M11 4v14M4 11h14" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
-            </svg>
-          </button>
-        </div>
+      <section id="dashboardView">
+        <div class="view-title" id="dashTitle">Mis proyectos</div>
+        <div class="view-subtitle" id="dashSubtitle"></div>
+        <div class="project-grid" id="projectGrid"></div>
       </section>
 
-      <!-- Vista de proyecto -->
-      <section id="viewProject" class="hidden">
-        <button class="btn-back" id="btnBack">
-          <svg width="6" height="11" viewBox="0 0 7 12" fill="none" style="display:inline;vertical-align:middle;margin-right:5px">
-            <path d="M6 1L1 6l5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          Proyectos
-        </button>
-
+      <!-- Project view -->
+      <section id="projectView" class="hidden">
+        <button class="btn-back" id="btnBack">← Volver</button>
         <div class="project-view-header">
           <div class="project-view-meta">
-            <div id="projectEmoji" class="project-emoji-large"></div>
+            <div class="project-emoji-large" id="pvEmoji"></div>
             <div>
-              <h2 class="project-view-title" id="projectTitle"></h2>
-              <p class="project-view-desc" id="projectDesc"></p>
+              <div class="project-view-title" id="pvTitle"></div>
+              <div class="project-view-desc" id="pvDesc"></div>
             </div>
           </div>
           <div class="project-header-actions">
-            <button class="btn-icon-action" id="btnEditProject" title="Editar proyecto">
-              <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-                <path d="M9.5 2.5l2 2L4 12H2v-2L9.5 2.5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </button>
-            <button class="btn-icon-action btn-danger" id="btnDeleteProject" title="Eliminar proyecto">
-              <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-                <path d="M2 3.5h10M5 3.5V2.5h4v1M5.5 6v4.5M8.5 6v4.5M3 3.5l.7 8h6.6l.7-8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </button>
+            <button class="btn-icon-action" id="btnEditProject" title="Editar">✎</button>
+            <button class="btn-icon-action btn-danger" id="btnDeleteProject" title="Eliminar">✕</button>
           </div>
         </div>
 
         <div class="progress-section">
-          <span class="progress-label">Avance</span>
+          <span class="progress-label" id="pvProgressLabel">0%</span>
           <div class="progress-slider-wrap">
-            <div class="progress-slider-fill" id="progressFill"></div>
-            <input type="range" class="progress-slider" id="progressSlider" min="0" max="100" value="0" />
+            <div class="progress-slider-fill" id="pvProgressFill" style="width:0%"></div>
+            <input type="range" min="0" max="100" value="0" class="progress-slider" id="pvProgressSlider" />
           </div>
-          <span class="progress-value" id="progressValue">0%</span>
+          <span class="progress-value" id="pvProgressValue">Avance</span>
         </div>
 
         <div class="project-columns">
-          <!-- Checklist -->
           <div class="col-left">
-            <div class="col-header">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="display:inline;margin-right:5px">
-                <rect x="1" y="1" width="10" height="10" rx="2.5" stroke="currentColor" stroke-width="1.3"/>
-                <path d="M3.5 6L5.5 8L8.5 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              Pasos del proyecto
-            </div>
-            <form class="step-add-form" id="stepAddForm" autocomplete="off">
-              <input type="text" id="stepInput" placeholder="Añadir paso…" maxlength="120" />
+            <div class="col-header">Pasos del proyecto</div>
+            <form class="step-add-form" id="stepAddForm">
+              <input type="text" id="stepInput" placeholder="Nuevo paso…" />
               <button type="submit" class="step-add-btn">Añadir</button>
             </form>
             <div class="steps-list" id="stepsList"></div>
           </div>
-
-          <!-- Acciones del día -->
           <div class="col-right">
-            <div class="col-header">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="display:inline;margin-right:5px">
-                <rect x="1" y="2" width="10" height="9" rx="2" stroke="currentColor" stroke-width="1.3"/>
-                <path d="M4 1v2M8 1v2M1 5h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-              </svg>
-              Acciones para mañana
-            </div>
-            <form class="tomorrow-add-form" id="tomorrowAddForm" autocomplete="off">
-              <input type="text" id="tomorrowInput" placeholder="¿Qué harás mañana?" maxlength="120" />
+            <div class="col-header">Acciones para mañana</div>
+            <form class="tomorrow-add-form" id="tomorrowAddForm">
+              <input type="text" id="tomorrowInput" placeholder="Acción para mañana…" />
               <button type="submit" class="tomorrow-add-btn">Añadir</button>
             </form>
             <div class="tomorrow-list" id="tomorrowList"></div>
-
             <div class="export-bar">
-              <button class="btn-export" id="btnExport">
-                <svg width="13" height="13" viewBox="0 0 14 14" fill="none" style="display:inline;vertical-align:middle;margin-right:6px">
-                  <path d="M7 1v8M4 6l3 3 3-3M2 10v1.5A1.5 1.5 0 003.5 13h7A1.5 1.5 0 0012 11.5V10" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-                Exportar mi día
-              </button>
+              <button class="btn-export" id="btnExport">Exportar mi día</button>
             </div>
           </div>
         </div>
@@ -150,39 +141,51 @@
     </main>
   </div>
 
-  <!-- ── Modal: nuevo / editar proyecto ── -->
-  <div class="modal-overlay hidden" id="modalOverlay">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <!-- ── MODAL: Nuevo / Editar proyecto ────────────────────── -->
+  <div class="modal-overlay hidden" id="projectModal">
+    <div class="modal">
       <div class="modal-header">
         <h3 id="modalTitle">Nuevo proyecto</h3>
-        <button class="modal-close" id="modalClose" aria-label="Cerrar">✕</button>
+        <button class="modal-close" id="modalClose">✕</button>
       </div>
-      <form id="projectForm" autocomplete="off">
+      <form id="projectForm">
         <label>
           Nombre del proyecto
-          <input type="text" id="formName" placeholder="Ej: Lanzamiento producto" maxlength="60" required />
+          <input type="text" id="fieldName" placeholder="Ej. Rediseño web" required maxlength="60" />
         </label>
         <label>
           Descripción (opcional)
-          <input type="text" id="formDesc" placeholder="Describe brevemente el objetivo" maxlength="120" />
+          <input type="text" id="fieldDesc" placeholder="Breve descripción…" maxlength="100" />
         </label>
         <label>
           Emoji
-          <input type="text" id="formEmoji" placeholder="🚀" maxlength="2" />
+          <div class="color-row" id="emojiRow"></div>
         </label>
-        <label>Color</label>
-        <div class="color-row" id="colorRow"></div>
+        <label>
+          Color
+          <div class="color-row" id="colorRow"></div>
+        </label>
         <div class="modal-actions">
-          <button type="submit" class="btn-primary" id="formSubmit">Crear proyecto</button>
+          <button type="submit" class="btn-primary" id="formSubmitBtn">Crear proyecto</button>
           <button type="button" class="btn-ghost" id="modalCancel">Cancelar</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- ── Toast ── -->
+  <!-- ── Toast ─────────────────────────────────────────────── -->
   <div class="toast-container" id="toastContainer"></div>
 
-  <script src="app.js"></script>
+  <!-- ── FAB ───────────────────────────────────────────────── -->
+  <div class="fab-wrap" id="fabWrap">
+    <button class="fab" id="fabBtn" title="Nuevo proyecto">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script type="module" src="app.js"></script>
 </body>
 </html>

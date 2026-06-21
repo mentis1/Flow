@@ -1,48 +1,90 @@
 /* ============================================================
-   FLOW — app.js  v3
-   Bugs corregidos:
-   - Eliminación de tareas "mañana" (botón × funcional)
-   - Exportar limpia la lista de tareas del día
-   - Editar y eliminar proyectos
-   - Barra de progreso con zona de color
-   - Toast de confirmación
-============================================================ */
+   FLOW — app.js v4 (Firebase Auth + Firestore)
+   ============================================================ */
 'use strict';
 
-// ── Constantes ────────────────────────────────────────────
-const STORAGE_KEY = 'flow-v3';
-const COLORS = ['#ff3b30','#ff9500','#ffcc00','#34c759','#007aff','#5856d6','#af52de','#ff2d55','#636366'];
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import {
+  getFirestore,
+  collection,
+  doc,
+  getDocs,
+  setDoc,
+  deleteDoc,
+  onSnapshot,
+  query,
+  orderBy
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+// ── Firebase config ─ REEMPLAZA CON TU CONFIG ──────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyD7b3YogSKZ8GigNizZN6JHumUQ6lSyre4",
+  authDomain: "flow-b450a.firebaseapp.com",
+  projectId: "flow-b450a",
+  storageBucket: "flow-b450a.firebasestorage.app",
+  messagingSenderId: "177344386137",
+  appId: "1:177344386137:web:a3ebc59923fb799eb90d48"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const auth        = getAuth(firebaseApp);
+const db          = getFirestore(firebaseApp);
+
+// ── Constantes ───────────────────────────────────────────────
+const COLORS        = ['#ff3b30','#ff9500','#ffcc00','#34c759','#007aff','#5856d6','#af52de','#ff2d55','#636366'];
 const EMOJIS_DEFAULT = ['🚀','💡','📊','🎯','🛠','📱','💼','🌟','🔥'];
 
-// ── Estado ────────────────────────────────────────────────
+// ── Estado ───────────────────────────────────────────────────
 const state = {
-  projects: load(),
+  projects: [],
   view: 'dashboard',
   activeProjectId: null,
   editingProjectId: null,
+  uid: null,
+  unsubscribe: null,
 };
 
-// ── Persistencia ──────────────────────────────────────────
-function load() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
-  catch { return []; }
+// ── Helpers Firestore ────────────────────────────────────────
+function projectsCol() {
+  return collection(db, 'users', state.uid, 'projects');
+}
+function projectDoc(id) {
+  return doc(db, 'users', state.uid, 'projects', id);
 }
 
-function save() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.projects));
+async function saveProject(project) {
+  await setDoc(projectDoc(project.id), project);
+}
+async function removeProject(id) {
+  await deleteDoc(projectDoc(id));
 }
 
-// ── Utilidades ────────────────────────────────────────────
+function subscribeProjects() {
+  if (state.unsubscribe) state.unsubscribe();
+  const q = query(projectsCol(), orderBy('createdAt', 'asc'));
+  state.unsubscribe = onSnapshot(q, snap => {
+    state.projects = snap.docs.map(d => d.data());
+    renderAll();
+  });
+}
+
+// ── Utilidades ───────────────────────────────────────────────
 function uid() { return Math.random().toString(36).slice(2, 10); }
 function getProject(id) { return state.projects.find(p => p.id === id); }
-
 function formatDateES(date = new Date()) {
   return new Intl.DateTimeFormat('es-ES', {
     weekday: 'long', day: '2-digit', month: 'long', year: 'numeric'
   }).format(date);
 }
 
-// ── Toast ─────────────────────────────────────────────────
+// ── Toast ────────────────────────────────────────────────────
 function showToast(msg, duration = 2600) {
   const container = document.getElementById('toastContainer');
   const el = document.createElement('div');
@@ -55,20 +97,20 @@ function showToast(msg, duration = 2600) {
   }, duration);
 }
 
-// ── Progress zone ─────────────────────────────────────────
+// ── Progress zone ────────────────────────────────────────────
 function applyProgressZone(fill, value) {
   if (!fill) return;
   const v = Number(value);
   let color;
-  if (v === 100) color = '#0f9d58';
-  else if (v >= 65) color = '#2383e2';
-  else if (v >= 35) color = '#dfab01';
-  else color = '#e03e3e';
+  if (v === 100)      color = '#0f9d58';
+  else if (v >= 65)   color = '#2383e2';
+  else if (v >= 35)   color = '#dfab01';
+  else                color = '#e03e3e';
   fill.style.background = color;
   fill.style.backgroundImage = 'none';
 }
 
-// ── Render: sidebar ───────────────────────────────────────
+// ── Render: sidebar ──────────────────────────────────────────
 function renderSidebar() {
   const nav = document.getElementById('sidebarProjects');
   const isDash = state.view === 'dashboard';
@@ -76,25 +118,19 @@ function renderSidebar() {
     .classList.toggle('active', isDash);
 
   if (!state.projects.length) { nav.innerHTML = ''; return; }
-
   nav.innerHTML = state.projects.map(p => `
-    <button
-      class="sidebar-project-item ${state.activeProjectId === p.id && state.view === 'project' ? 'active' : ''}"
-      data-id="${p.id}"
-    >
+    <button class="sidebar-project-item${state.activeProjectId === p.id && !isDash ? ' active' : ''}" data-id="${p.id}">
       <span class="sidebar-dot" style="background:${p.color}"></span>
-      <span class="sidebar-project-name">${escHtml(p.emoji || '📁')} ${escHtml(p.name)}</span>
+      <span class="sidebar-project-name">${p.emoji} ${p.name}</span>
     </button>
   `).join('');
-
   nav.querySelectorAll('.sidebar-project-item').forEach(btn => {
     btn.addEventListener('click', () => openProject(btn.dataset.id));
   });
 }
 
-// ── Render: dashboard ─────────────────────────────────────
+// ── Render: dashboard ────────────────────────────────────────
 function renderDashboard() {
-  // subtitle
   const sub = document.getElementById('dashSubtitle');
   if (sub) {
     const n = state.projects.length;
@@ -104,364 +140,429 @@ function renderDashboard() {
   if (!state.projects.length) {
     grid.innerHTML = `
       <div class="empty-dashboard" style="grid-column:1/-1">
-        <div class="empty-icon">✦</div>
-        <strong>Empieza creando tu primer proyecto</strong><br>
-        Pulsa el botón <strong>+</strong> para añadir uno.
+        <div class="empty-icon">📂</div>
+        <div>Todavía no tienes proyectos.<br>Pulsa <strong>+</strong> para crear el primero.</div>
       </div>`;
     return;
   }
-
-  grid.innerHTML = state.projects.map(p => `
-    <div class="project-tile" data-id="${p.id}" role="button" tabindex="0" aria-label="${escHtml(p.name)}">
-      <div class="project-tile-cover" style="background:${p.color}22">
-        <span style="filter:drop-shadow(0 2px 6px ${p.color}66)">${escHtml(p.emoji || '📁')}</span>
-      </div>
-      <div class="project-tile-name">${escHtml(p.name)}</div>
-      ${p.desc ? `<div class="project-tile-desc">${escHtml(p.desc)}</div>` : ''}
-      <div class="project-tile-progress">
-        <div class="project-tile-progress-fill" style="width:${p.progress || 0}%; background:${p.color}cc"></div>
-      </div>
-    </div>
-  `).join('');
-
+  grid.innerHTML = state.projects.map(p => {
+    const done  = (p.steps || []).filter(s => s.done).length;
+    const total = (p.steps || []).length;
+    const pct   = p.progress ?? 0;
+    return `
+      <div class="project-tile" data-id="${p.id}">
+        <div class="project-tile-cover" style="background:${p.color}22">
+          <span style="font-size:1.3rem">${p.emoji}</span>
+        </div>
+        <div class="project-tile-name">${p.name}</div>
+        <div class="project-tile-desc">${p.desc || '&nbsp;'}</div>
+        <div class="project-tile-meta">${done}/${total} pasos · ${pct}%</div>
+        <div class="project-tile-progress">
+          <div class="project-tile-progress-fill" style="width:${pct}%;background:${p.color}"></div>
+        </div>
+      </div>`;
+  }).join('');
   grid.querySelectorAll('.project-tile').forEach(tile => {
     tile.addEventListener('click', () => openProject(tile.dataset.id));
-    tile.addEventListener('keydown', e => { if (e.key === 'Enter') openProject(tile.dataset.id); });
   });
 }
 
-// ── Render: project view ──────────────────────────────────
-function renderProject() {
-  const p = getProject(state.activeProjectId);
-  if (!p) { goToDashboard(); return; }
-
-  document.getElementById('projectEmoji').textContent = p.emoji || '📁';
-  document.getElementById('projectTitle').textContent = p.name;
-  document.getElementById('projectDesc').textContent = p.desc || '';
-
-  const slider = document.getElementById('progressSlider');
-  const fill = document.getElementById('progressFill');
-  const valEl = document.getElementById('progressValue');
-
-  slider.value = p.progress || 0;
-  fill.style.width = `${p.progress || 0}%`;
-  valEl.textContent = `${p.progress || 0}%`;
-  applyProgressZone(fill, p.progress || 0);
-
-  renderSteps();
-  renderTomorrow();
-}
-
-// ── Render: steps ─────────────────────────────────────────
-function renderSteps() {
+// ── Render: project view ──────────────────────────────────────
+function renderProjectView() {
   const p = getProject(state.activeProjectId);
   if (!p) return;
+
+  document.getElementById('pvEmoji').textContent = p.emoji;
+  document.getElementById('pvTitle').textContent = p.name;
+  document.getElementById('pvDesc').textContent  = p.desc || '';
+
+  const slider = document.getElementById('pvProgressSlider');
+  const fill   = document.getElementById('pvProgressFill');
+  const label  = document.getElementById('pvProgressLabel');
+  const val    = p.progress ?? 0;
+  slider.value = val;
+  fill.style.width = val + '%';
+  label.textContent = val + '%';
+  applyProgressZone(fill, val);
+
+  renderSteps(p);
+  renderTomorrow(p);
+}
+
+function renderSteps(p) {
   const list = document.getElementById('stepsList');
+  const steps = p.steps || [];
+  if (!steps.length) { list.innerHTML = '<div style="color:var(--text-3);font-size:13px;padding:8px 4px">Sin pasos todavía.</div>'; return; }
 
-  const pending = (p.steps || []).filter(s => !s.done);
-  const done = (p.steps || []).filter(s => s.done);
+  const pending = steps.filter(s => !s.done);
+  const done    = steps.filter(s => s.done);
 
-  const stepHtml = (s) => `
-    <div class="step-row" data-sid="${s.id}">
-      <button class="step-checkbox ${s.done ? 'checked' : ''}" data-sid="${s.id}" aria-label="${s.done ? 'Desmarcar' : 'Marcar como hecho'}"></button>
-      <span class="step-text ${s.done ? 'done' : ''}">${escHtml(s.text)}</span>
-      <button class="step-delete" data-sid="${s.id}" aria-label="Eliminar paso">
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-          <path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-        </svg>
-      </button>
-    </div>`;
+  list.innerHTML = [
+    ...pending.map(s => stepHTML(s)),
+    done.length ? `<div class="steps-done-divider">Completados (${done.length})</div>` : '',
+    ...done.map(s => stepHTML(s))
+  ].join('');
 
-  list.innerHTML =
-    pending.map(stepHtml).join('') +
-    (done.length ? `<div class="steps-done-divider">Completados · ${done.length}</div>` + done.map(stepHtml).join('') : '');
-
-  list.querySelectorAll('.step-checkbox').forEach(btn => {
-    btn.addEventListener('click', () => toggleStep(btn.dataset.sid));
+  list.querySelectorAll('.step-checkbox').forEach(cb => {
+    cb.addEventListener('click', () => toggleStep(cb.dataset.id));
   });
   list.querySelectorAll('.step-delete').forEach(btn => {
-    btn.addEventListener('click', () => deleteStep(btn.dataset.sid));
+    btn.addEventListener('click', () => deleteStep(btn.dataset.id));
   });
 }
 
-// ── Render: tomorrow ──────────────────────────────────────
-function renderTomorrow() {
-  const p = getProject(state.activeProjectId);
-  if (!p) return;
+function stepHTML(s) {
+  return `
+    <div class="step-row">
+      <div class="step-checkbox${s.done ? ' checked' : ''}" data-id="${s.id}"></div>
+      <span class="step-text${s.done ? ' done' : ''}">${s.text}</span>
+      <button class="step-delete" data-id="${s.id}" title="Eliminar">✕</button>
+    </div>`;
+}
+
+function renderTomorrow(p) {
   const list = document.getElementById('tomorrowList');
-
-  if (!(p.tomorrow || []).length) {
-    list.innerHTML = '<div style="color:var(--text-tertiary);font-size:12px;padding:8px 6px;">Sin acciones por ahora.</div>';
-    return;
-  }
-
-  list.innerHTML = (p.tomorrow || []).map(t => `
-    <div class="tomorrow-row" data-tid="${t.id}">
+  const items = p.tomorrow || [];
+  if (!items.length) { list.innerHTML = '<div style="color:var(--text-3);font-size:13px;padding:8px 4px">Sin acciones para mañana.</div>'; return; }
+  list.innerHTML = items.map(t => `
+    <div class="tomorrow-row">
       <span class="tomorrow-bullet"></span>
-      <span class="tomorrow-text">${escHtml(t.text)}</span>
-      <button class="tomorrow-delete" data-tid="${t.id}" aria-label="Eliminar acción">
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-          <path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-        </svg>
-      </button>
-    </div>
-  `).join('');
-
-  // ✅ FIX: botones eliminar "mañana" correctamente enlazados
+      <span class="tomorrow-text">${t.text}</span>
+      <button class="tomorrow-delete" data-id="${t.id}" title="Eliminar">✕</button>
+    </div>`).join('');
   list.querySelectorAll('.tomorrow-delete').forEach(btn => {
-    btn.addEventListener('click', () => deleteTomorrow(btn.dataset.tid));
+    btn.addEventListener('click', () => deleteTomorrow(btn.dataset.id));
   });
 }
 
-// ── Acciones: steps ───────────────────────────────────────
-function addStep(text) {
-  const p = getProject(state.activeProjectId);
-  if (!p) return;
-  p.steps = p.steps || [];
-  p.steps.push({ id: uid(), text, done: false });
-  save(); renderSteps();
+// ── Acciones de proyecto ──────────────────────────────────────
+function openProject(id) {
+  state.view = 'project';
+  state.activeProjectId = id;
+  document.getElementById('dashboardView').classList.add('hidden');
+  document.getElementById('projectView').classList.remove('hidden');
+  document.getElementById('fabWrap').classList.add('hidden');
+  renderSidebar();
+  renderProjectView();
 }
 
-function toggleStep(sid) {
-  const p = getProject(state.activeProjectId);
-  if (!p) return;
-  const s = p.steps.find(s => s.id === sid);
-  if (s) s.done = !s.done;
-  save(); renderSteps();
-}
-
-function deleteStep(sid) {
-  const p = getProject(state.activeProjectId);
-  if (!p) return;
-  p.steps = p.steps.filter(s => s.id !== sid);
-  save(); renderSteps();
-}
-
-// ── Acciones: tomorrow ────────────────────────────────────
-function addTomorrow(text) {
-  const p = getProject(state.activeProjectId);
-  if (!p) return;
-  p.tomorrow = p.tomorrow || [];
-  p.tomorrow.push({ id: uid(), text });
-  save(); renderTomorrow();
-}
-
-// ✅ FIX: deleteTomorrow ahora busca por id correcto
-function deleteTomorrow(tid) {
-  const p = getProject(state.activeProjectId);
-  if (!p) return;
-  p.tomorrow = (p.tomorrow || []).filter(t => t.id !== tid);
-  save(); renderTomorrow();
-  showToast('Acción eliminada');
-}
-
-// ── Exportar mi día ───────────────────────────────────────
-// ✅ FIX: después de exportar, limpia las acciones del día
-function exportDay() {
-  const p = getProject(state.activeProjectId);
-  if (!p) return;
-
-  const date = formatDateES();
-  const steps = (p.steps || []).map(s => `  ${s.done ? '✅' : '⬜'} ${s.text}`).join('\n');
-  const tomorrow = (p.tomorrow || []).map(t => `  • ${t.text}`).join('\n');
-
-  const text =
-    `📋 FLOW — Resumen del día\n` +
-    `${date}\n\n` +
-    `Proyecto: ${p.emoji || ''} ${p.name}\n` +
-    `Avance: ${p.progress || 0}%\n\n` +
-    `PASOS DEL PROYECTO:\n${steps || '  (ninguno)'}\n\n` +
-    `ACCIONES PARA MAÑANA:\n${tomorrow || '  (ninguna)'}`;
-
-  navigator.clipboard.writeText(text).then(() => {
-    showToast('📋 Copiado al portapapeles');
-  }).catch(() => {
-    // fallback: descarga como .txt
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `flow-${p.name.replace(/\s+/g,'-')}.txt`;
-    a.click(); URL.revokeObjectURL(url);
-    showToast('📄 Archivo descargado');
-  });
-
-  // ✅ Limpiar lista "para mañana" tras exportar
-  p.tomorrow = [];
-  save(); renderTomorrow();
-}
-
-// ── Navegación ────────────────────────────────────────────
 function goToDashboard() {
   state.view = 'dashboard';
   state.activeProjectId = null;
-  document.getElementById('viewDashboard').classList.remove('hidden');
-  document.getElementById('viewProject').classList.add('hidden');
+  document.getElementById('dashboardView').classList.remove('hidden');
+  document.getElementById('projectView').classList.add('hidden');
+  document.getElementById('fabWrap').classList.remove('hidden');
+  renderSidebar();
   renderDashboard();
-  renderSidebar();
 }
 
-function openProject(id) {
-  const p = getProject(id);
+async function toggleStep(stepId) {
+  const p = getProject(state.activeProjectId);
   if (!p) return;
-  state.view = 'project';
-  state.activeProjectId = id;
-  document.getElementById('viewDashboard').classList.add('hidden');
-  document.getElementById('viewProject').classList.remove('hidden');
-  renderProject();
-  renderSidebar();
+  p.steps = (p.steps || []).map(s => s.id === stepId ? { ...s, done: !s.done } : s);
+  await saveProject(p);
 }
 
-// ── Modal: crear / editar proyecto ───────────────────────
-let selectedColor = COLORS[4];
+async function deleteStep(stepId) {
+  const p = getProject(state.activeProjectId);
+  if (!p) return;
+  p.steps = (p.steps || []).filter(s => s.id !== stepId);
+  await saveProject(p);
+}
 
+async function deleteTomorrow(tId) {
+  const p = getProject(state.activeProjectId);
+  if (!p) return;
+  p.tomorrow = (p.tomorrow || []).filter(t => t.id !== tId);
+  await saveProject(p);
+}
+
+// ── Modal helpers ─────────────────────────────────────────────
 function openModal(editId = null) {
   state.editingProjectId = editId;
-  const modal = document.getElementById('modalOverlay');
+  const modal = document.getElementById('projectModal');
   const title = document.getElementById('modalTitle');
-  const formSubmit = document.getElementById('formSubmit');
+  const submitBtn = document.getElementById('formSubmitBtn');
+
+  buildEmojiRow();
+  buildColorRow();
 
   if (editId) {
     const p = getProject(editId);
-    document.getElementById('formName').value = p.name;
-    document.getElementById('formDesc').value = p.desc || '';
-    document.getElementById('formEmoji').value = p.emoji || '';
-    selectedColor = p.color || COLORS[4];
+    document.getElementById('fieldName').value = p.name;
+    document.getElementById('fieldDesc').value = p.desc || '';
+    selectEmoji(p.emoji);
+    selectColor(p.color);
     title.textContent = 'Editar proyecto';
-    formSubmit.textContent = 'Guardar cambios';
+    submitBtn.textContent = 'Guardar cambios';
   } else {
-    document.getElementById('projectForm').reset();
-    document.getElementById('formEmoji').value = EMOJIS_DEFAULT[Math.floor(Math.random() * EMOJIS_DEFAULT.length)];
-    selectedColor = COLORS[Math.floor(Math.random() * COLORS.length)];
+    document.getElementById('fieldName').value = '';
+    document.getElementById('fieldDesc').value = '';
+    selectEmoji(EMOJIS_DEFAULT[0]);
+    selectColor(COLORS[4]);
     title.textContent = 'Nuevo proyecto';
-    formSubmit.textContent = 'Crear proyecto';
+    submitBtn.textContent = 'Crear proyecto';
   }
 
-  renderColorRow();
   modal.classList.remove('hidden');
-  setTimeout(() => document.getElementById('formName').focus(), 60);
+  document.getElementById('fieldName').focus();
 }
 
 function closeModal() {
-  document.getElementById('modalOverlay').classList.add('hidden');
+  document.getElementById('projectModal').classList.add('hidden');
   state.editingProjectId = null;
 }
 
-function renderColorRow() {
+let _selectedEmoji = EMOJIS_DEFAULT[0];
+let _selectedColor = COLORS[4];
+
+function buildEmojiRow() {
+  const row = document.getElementById('emojiRow');
+  row.innerHTML = EMOJIS_DEFAULT.map(e => `
+    <button type="button" class="emoji-swatch${e === _selectedEmoji ? ' active' : ''}" data-emoji="${e}">${e}</button>
+  `).join('');
+  row.querySelectorAll('.emoji-swatch').forEach(btn => {
+    btn.addEventListener('click', () => selectEmoji(btn.dataset.emoji));
+  });
+}
+
+function selectEmoji(e) {
+  _selectedEmoji = e;
+  document.querySelectorAll('.emoji-swatch').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.emoji === e);
+  });
+}
+
+function buildColorRow() {
   const row = document.getElementById('colorRow');
   row.innerHTML = COLORS.map(c => `
-    <button type="button" class="color-swatch ${c === selectedColor ? 'active' : ''}"
-      style="background:${c}" data-color="${c}" aria-label="Color ${c}"></button>
+    <div class="color-swatch${c === _selectedColor ? ' active' : ''}" data-color="${c}" style="background:${c}"></div>
   `).join('');
   row.querySelectorAll('.color-swatch').forEach(sw => {
-    sw.addEventListener('click', () => {
-      selectedColor = sw.dataset.color;
-      renderColorRow();
-    });
+    sw.addEventListener('click', () => selectColor(sw.dataset.color));
   });
 }
 
-function submitProject(e) {
-  e.preventDefault();
-  const name = document.getElementById('formName').value.trim();
-  const desc = document.getElementById('formDesc').value.trim();
-  const emoji = document.getElementById('formEmoji').value.trim() || '📁';
-  if (!name) return;
+function selectColor(c) {
+  _selectedColor = c;
+  document.querySelectorAll('.color-swatch').forEach(sw => {
+    sw.classList.toggle('active', sw.dataset.color === c);
+  });
+}
 
-  if (state.editingProjectId) {
-    const p = getProject(state.editingProjectId);
-    if (p) { p.name = name; p.desc = desc; p.emoji = emoji; p.color = selectedColor; }
-    showToast('✏️ Proyecto actualizado');
-  } else {
-    state.projects.push({
-      id: uid(), name, desc, emoji,
-      color: selectedColor,
-      progress: 0, steps: [], tomorrow: [],
-    });
-    showToast('✦ Proyecto creado');
-  }
-
-  save(); closeModal();
-  if (state.view === 'dashboard') renderDashboard();
-  else if (state.view === 'project' && state.editingProjectId === state.activeProjectId) renderProject();
+// ── Render all ───────────────────────────────────────────────
+function renderAll() {
   renderSidebar();
+  if (state.view === 'dashboard') renderDashboard();
+  else renderProjectView();
 }
 
-// ── Eliminar proyecto ─────────────────────────────────────
-function deleteProject(id) {
-  const p = getProject(id);
-  if (!p) return;
-  if (!confirm(`¿Eliminar el proyecto "${p.name}"? Esta acción no se puede deshacer.`)) return;
-  state.projects = state.projects.filter(x => x.id !== id);
-  save(); showToast('🗑 Proyecto eliminado');
-  goToDashboard();
+// ── Login UI ─────────────────────────────────────────────────
+function showLoginView() {
+  document.getElementById('loginView').classList.remove('hidden');
+  document.getElementById('appShell').classList.add('hidden');
+  document.getElementById('fabWrap').classList.add('hidden');
 }
 
-// ── Escape HTML ───────────────────────────────────────────
-function escHtml(str = '') {
-  return String(str)
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;');
+function showAppView() {
+  document.getElementById('loginView').classList.add('hidden');
+  document.getElementById('appShell').classList.remove('hidden');
+  document.getElementById('fabWrap').classList.remove('hidden');
 }
 
-// ── Init ──────────────────────────────────────────────────
-function init() {
-  // Dashboard
+function setLoginError(msg) {
+  const el = document.getElementById('loginError');
+  if (msg) { el.textContent = msg; el.classList.remove('hidden'); }
+  else el.classList.add('hidden');
+}
+
+// ── Auth state ───────────────────────────────────────────────
+onAuthStateChanged(auth, user => {
+  if (user) {
+    state.uid = user.id || user.uid;
+    showAppView();
+    subscribeProjects();
+    renderSidebar();
+    renderDashboard();
+  } else {
+    state.uid = null;
+    if (state.unsubscribe) { state.unsubscribe(); state.unsubscribe = null; }
+    state.projects = [];
+    showLoginView();
+  }
+});
+
+// ── DOM ready ────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+
+  // ── Login form ──
+  let isRegisterMode = false;
+
+  document.getElementById('toggleLoginBtn').addEventListener('click', () => {
+    isRegisterMode = !isRegisterMode;
+    setLoginError('');
+    document.getElementById('loginForm').classList.toggle('hidden', isRegisterMode);
+    document.getElementById('registerForm').classList.toggle('hidden', !isRegisterMode);
+    document.getElementById('toggleLoginText').textContent = isRegisterMode ? '¿Ya tienes cuenta?' : '¿No tienes cuenta?';
+    document.getElementById('toggleLoginBtn').textContent  = isRegisterMode ? 'Iniciar sesión' : 'Crear cuenta';
+  });
+
+  document.getElementById('loginForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    setLoginError('');
+    const email    = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    document.getElementById('loginBtn').textContent = 'Entrando…';
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (err) {
+      setLoginError(friendlyError(err.code));
+      document.getElementById('loginBtn').textContent = 'Iniciar sesión';
+    }
+  });
+
+  document.getElementById('registerForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    setLoginError('');
+    const email    = document.getElementById('registerEmail').value.trim();
+    const password = document.getElementById('registerPassword').value;
+    document.getElementById('registerBtn').textContent = 'Creando…';
+    try {
+      await createUserWithEmailAndPassword(auth, email, password);
+    } catch (err) {
+      setLoginError(friendlyError(err.code));
+      document.getElementById('registerBtn').textContent = 'Crear cuenta';
+    }
+  });
+
+  document.getElementById('logoutBtn').addEventListener('click', async () => {
+    if (state.unsubscribe) state.unsubscribe();
+    await signOut(auth);
+    state.projects = [];
+    state.view = 'dashboard';
+    state.activeProjectId = null;
+  });
+
+  // ── Navegación ──
   document.querySelector('.nav-item[data-section="dashboard"]')
     .addEventListener('click', goToDashboard);
-  document.getElementById('btnNewProject').addEventListener('click', () => openModal());
-  document.getElementById('btnNewProjectSidebar').addEventListener('click', () => openModal());
-
-  // Volver
   document.getElementById('btnBack').addEventListener('click', goToDashboard);
 
-  // Editar / eliminar proyecto
-  document.getElementById('btnEditProject').addEventListener('click', () => openModal(state.activeProjectId));
-  document.getElementById('btnDeleteProject').addEventListener('click', () => deleteProject(state.activeProjectId));
-
-  // Progress slider
-  const slider = document.getElementById('progressSlider');
-  const fill = document.getElementById('progressFill');
-  const valEl = document.getElementById('progressValue');
-
-  slider.addEventListener('input', () => {
-    const v = slider.value;
-    fill.style.width = `${v}%`;
-    valEl.textContent = `${v}%`;
-    applyProgressZone(fill, v);
-    const p = getProject(state.activeProjectId);
-    if (p) { p.progress = Number(v); save(); }
-  });
-
-  // Añadir paso
-  document.getElementById('stepAddForm').addEventListener('submit', e => {
-    e.preventDefault();
-    const inp = document.getElementById('stepInput');
-    if (inp.value.trim()) { addStep(inp.value.trim()); inp.value = ''; }
-  });
-
-  // Añadir tarea mañana
-  document.getElementById('tomorrowAddForm').addEventListener('submit', e => {
-    e.preventDefault();
-    const inp = document.getElementById('tomorrowInput');
-    if (inp.value.trim()) { addTomorrow(inp.value.trim()); inp.value = ''; }
-  });
-
-  // Exportar
-  document.getElementById('btnExport').addEventListener('click', exportDay);
-
-  // Modal
-  document.getElementById('projectForm').addEventListener('submit', submitProject);
+  // ── FAB / Nuevo proyecto ──
+  document.getElementById('fabBtn').addEventListener('click', () => openModal());
+  document.getElementById('sidebarAddBtn').addEventListener('click', () => openModal());
   document.getElementById('modalClose').addEventListener('click', closeModal);
   document.getElementById('modalCancel').addEventListener('click', closeModal);
-  document.getElementById('modalOverlay').addEventListener('click', e => {
-    if (e.target === document.getElementById('modalOverlay')) closeModal();
+  document.getElementById('projectModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('projectModal')) closeModal();
   });
 
-  // Render inicial
-  renderDashboard();
-  renderSidebar();
-}
+  // ── Editar / Eliminar proyecto ──
+  document.getElementById('btnEditProject').addEventListener('click', () => {
+    if (state.activeProjectId) openModal(state.activeProjectId);
+  });
+  document.getElementById('btnDeleteProject').addEventListener('click', async () => {
+    if (!state.activeProjectId) return;
+    const p = getProject(state.activeProjectId);
+    if (!p) return;
+    if (!confirm(`¿Eliminar el proyecto "${p.name}"? Esta acción no se puede deshacer.`)) return;
+    await removeProject(state.activeProjectId);
+    goToDashboard();
+    showToast('Proyecto eliminado.');
+  });
 
-document.addEventListener('DOMContentLoaded', init);
+  // ── Formulario de proyecto ──
+  document.getElementById('projectForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const name = document.getElementById('fieldName').value.trim();
+    const desc = document.getElementById('fieldDesc').value.trim();
+    if (!name) return;
+
+    if (state.editingProjectId) {
+      const p = getProject(state.editingProjectId);
+      p.name  = name;
+      p.desc  = desc;
+      p.emoji = _selectedEmoji;
+      p.color = _selectedColor;
+      await saveProject(p);
+      showToast('Proyecto actualizado.');
+    } else {
+      const newProject = {
+        id: uid(), name, desc,
+        emoji: _selectedEmoji, color: _selectedColor,
+        progress: 0, steps: [], tomorrow: [],
+        createdAt: Date.now()
+      };
+      await saveProject(newProject);
+      showToast('Proyecto creado.');
+    }
+    closeModal();
+  });
+
+  // ── Progress slider ──
+  document.getElementById('pvProgressSlider').addEventListener('input', async e => {
+    const val  = Number(e.target.value);
+    const fill = document.getElementById('pvProgressFill');
+    fill.style.width = val + '%';
+    document.getElementById('pvProgressLabel').textContent = val + '%';
+    applyProgressZone(fill, val);
+    const p = getProject(state.activeProjectId);
+    if (!p) return;
+    p.progress = val;
+    await saveProject(p);
+  });
+
+  // ── Añadir paso ──
+  document.getElementById('stepAddForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const input = document.getElementById('stepInput');
+    const text  = input.value.trim();
+    if (!text) return;
+    const p = getProject(state.activeProjectId);
+    if (!p) return;
+    p.steps = [...(p.steps || []), { id: uid(), text, done: false }];
+    await saveProject(p);
+    input.value = '';
+  });
+
+  // ── Añadir mañana ──
+  document.getElementById('tomorrowAddForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const input = document.getElementById('tomorrowInput');
+    const text  = input.value.trim();
+    if (!text) return;
+    const p = getProject(state.activeProjectId);
+    if (!p) return;
+    p.tomorrow = [...(p.tomorrow || []), { id: uid(), text }];
+    await saveProject(p);
+    input.value = '';
+  });
+
+  // ── Exportar día ──
+  document.getElementById('btnExport').addEventListener('click', () => {
+    const p = getProject(state.activeProjectId);
+    if (!p) return;
+    const date    = formatDateES();
+    const pending = (p.steps || []).filter(s => !s.done).map(s => `- [ ] ${s.text}`).join('\n') || '  (sin pasos pendientes)';
+    const done    = (p.steps || []).filter(s => s.done).map(s => `- [x] ${s.text}`).join('\n') || '';
+    const tmrw    = (p.tomorrow || []).map(t => `- ${t.text}`).join('\n') || '  (sin acciones para mañana)';
+    const text    = `# ${p.emoji} ${p.name} — ${date}\nProgreso: ${p.progress ?? 0}%\n\n## Pasos pendientes\n${pending}\n${done ? `\n## Completados\n${done}` : ''}\n\n## Acciones para mañana\n${tmrw}`;
+    navigator.clipboard.writeText(text).then(() => showToast('Resumen copiado al portapapeles ✓'));
+    p.tomorrow = [];
+    saveProject(p);
+  });
+});
+
+// ── Mensajes de error amigables ──────────────────────────────
+function friendlyError(code) {
+  const map = {
+    'auth/user-not-found':      'No existe ninguna cuenta con ese correo.',
+    'auth/wrong-password':      'Contraseña incorrecta.',
+    'auth/invalid-email':       'El correo no es válido.',
+    'auth/email-already-in-use':'Ya existe una cuenta con ese correo.',
+    'auth/weak-password':       'La contraseña debe tener al menos 6 caracteres.',
+    'auth/too-many-requests':   'Demasiados intentos fallidos. Inténtalo más tarde.',
+    'auth/invalid-credential':  'Correo o contraseña incorrectos.',
+  };
+  return map[code] || 'Error al autenticar. Inténtalo de nuevo.';
+}
