@@ -209,13 +209,97 @@ function renderSteps(p) {
   list.querySelectorAll('.step-delete').forEach(btn => {
     btn.addEventListener('click', () => deleteStep(btn.dataset.id));
   });
+
+  // Inline edit on double-click
+  list.querySelectorAll('.step-text').forEach(span => {
+    span.addEventListener('dblclick', () => startEditStep(span));
+  });
+
+  // Drag-to-reorder
+  setupStepDragDrop(list, p);
+}
+
+function startEditStep(span) {
+  const stepId = span.dataset.id;
+  const currentText = span.textContent;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = currentText;
+  input.className = 'step-edit-input';
+  span.replaceWith(input);
+  input.focus();
+  input.select();
+
+  async function commitEdit() {
+    const newText = input.value.trim();
+    const p = getProject(state.activeProjectId);
+    if (!p) return;
+    if (newText && newText !== currentText) {
+      p.steps = (p.steps || []).map(s => s.id === stepId ? { ...s, text: newText } : s);
+      await saveProject(p);
+    } else {
+      // Revert without saving
+      const newSpan = document.createElement('span');
+      newSpan.className = span.className;
+      newSpan.dataset.id = stepId;
+      newSpan.title = 'Doble clic para editar';
+      newSpan.textContent = currentText;
+      newSpan.addEventListener('dblclick', () => startEditStep(newSpan));
+      input.replaceWith(newSpan);
+    }
+  }
+
+  input.addEventListener('blur', commitEdit);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { input.value = currentText; input.blur(); }
+  });
+}
+
+let _dragSrcId = null;
+
+function setupStepDragDrop(list, p) {
+  const rows = list.querySelectorAll('.step-row[data-step-id]');
+  rows.forEach(row => {
+    row.addEventListener('dragstart', e => {
+      _dragSrcId = row.dataset.stepId;
+      row.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging');
+      list.querySelectorAll('.step-row').forEach(r => r.classList.remove('drag-over'));
+    });
+    row.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      list.querySelectorAll('.step-row').forEach(r => r.classList.remove('drag-over'));
+      row.classList.add('drag-over');
+    });
+    row.addEventListener('drop', async e => {
+      e.preventDefault();
+      const targetId = row.dataset.stepId;
+      if (!_dragSrcId || _dragSrcId === targetId) return;
+      const proj = getProject(state.activeProjectId);
+      if (!proj) return;
+      const steps = [...(proj.steps || [])];
+      const srcIdx = steps.findIndex(s => s.id === _dragSrcId);
+      const tgtIdx = steps.findIndex(s => s.id === targetId);
+      if (srcIdx === -1 || tgtIdx === -1) return;
+      const [moved] = steps.splice(srcIdx, 1);
+      steps.splice(tgtIdx, 0, moved);
+      proj.steps = steps;
+      await saveProject(proj);
+    });
+  });
 }
 
 function stepHTML(s) {
   return `
-    <div class="step-row">
+    <div class="step-row${s.done ? ' step-done-row' : ''}" data-step-id="${s.id}" draggable="true">
+      <span class="step-drag-handle" title="Arrastrar">⠿</span>
       <div class="step-checkbox${s.done ? ' checked' : ''}" data-id="${s.id}"></div>
-      <span class="step-text${s.done ? ' done' : ''}">${s.text}</span>
+      <span class="step-text${s.done ? ' done' : ''}" data-id="${s.id}" title="Doble clic para editar">${s.text}</span>
       <button class="step-delete" data-id="${s.id}" title="Eliminar">✕</button>
     </div>`;
 }
@@ -457,6 +541,23 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target === document.getElementById('projectModal')) closeModal();
   });
 
+  // ── Exportar todo (sidebar) ──
+  document.getElementById('btnExportAll').addEventListener('click', () => {
+    if (!state.projects.length) { showToast('No hay proyectos para exportar.'); return; }
+    const date = formatDateES();
+    const sections = state.projects.map(p => {
+      const pending = (p.steps || []).filter(s => !s.done).map(s => `  - [ ] ${s.text}`).join('\n') || '  (sin pasos pendientes)';
+      const done    = (p.steps || []).filter(s => s.done).map(s => `  - [x] ${s.text}`).join('\n');
+      const tmrw    = (p.tomorrow || []).map(t => `  - ${t.text}`).join('\n');
+      let section = `## ${p.emoji} ${p.name} — ${p.progress ?? 0}%\n### Pasos pendientes\n${pending}`;
+      if (done) section += `\n### Completados\n${done}`;
+      if (tmrw) section += `\n### Acciones para mañana\n${tmrw}`;
+      return section;
+    }).join('\n\n---\n\n');
+    const text = `# 📋 Exportación completa — ${date}\n\n${sections}`;
+    navigator.clipboard.writeText(text).then(() => showToast('Todos los proyectos copiados ✓'));
+  });
+
   // ── Editar / Eliminar proyecto ──
   document.getElementById('btnEditProject').addEventListener('click', () => {
     if (state.activeProjectId) openModal(state.activeProjectId);
@@ -539,7 +640,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ── Exportar día ──
-  document.getElementById('btnExport').addEventListener('click', () => {
+  document.getElementById('btnExport').addEventListener('click', async () => {
     const p = getProject(state.activeProjectId);
     if (!p) return;
     const date    = formatDateES();
@@ -548,8 +649,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const tmrw    = (p.tomorrow || []).map(t => `- ${t.text}`).join('\n') || '  (sin acciones para mañana)';
     const text    = `# ${p.emoji} ${p.name} — ${date}\nProgreso: ${p.progress ?? 0}%\n\n## Pasos pendientes\n${pending}\n${done ? `\n## Completados\n${done}` : ''}\n\n## Acciones para mañana\n${tmrw}`;
     navigator.clipboard.writeText(text).then(() => showToast('Resumen copiado al portapapeles ✓'));
+
+    // Mover acciones de mañana a pasos del proyecto (sin marcar)
+    const newSteps = (p.tomorrow || []).map(t => ({ id: uid(), text: t.text, done: false }));
+    p.steps = [...(p.steps || []), ...newSteps];
     p.tomorrow = [];
-    saveProject(p);
+    await saveProject(p);
   });
 });
 
