@@ -574,34 +574,34 @@ img, svg { display: block; }
   line-height: 1.4;
 }
 .step-label-btn.label-importante {
+  background: var(--bg-input);
+  color: var(--text-3);
+  border-color: var(--border);
+}
+.step-label-btn.label-importante.active {
   background: rgba(224,62,62,.10);
   color: #c0392b;
   border-color: rgba(224,62,62,.22);
 }
-.step-label-btn.label-importante.active {
-  background: #e03e3e;
-  color: #fff;
-  border-color: #e03e3e;
-}
 .step-label-btn.label-sinprisa {
+  background: var(--bg-input);
+  color: var(--text-3);
+  border-color: var(--border);
+}
+.step-label-btn.label-sinprisa.active {
   background: rgba(52,199,89,.10);
   color: #1a7a3c;
   border-color: rgba(52,199,89,.22);
 }
-.step-label-btn.label-sinprisa.active {
-  background: #34c759;
-  color: #fff;
-  border-color: #34c759;
-}
 .step-label-btn.label-inminente {
+  background: var(--bg-input);
+  color: var(--text-3);
+  border-color: var(--border);
+}
+.step-label-btn.label-inminente.active {
   background: rgba(255,149,0,.10);
   color: #b35900;
   border-color: rgba(255,149,0,.22);
-}
-.step-label-btn.label-inminente.active {
-  background: #ff9500;
-  color: #fff;
-  border-color: #ff9500;
 }
 
 /* Section divider between pending / done */
