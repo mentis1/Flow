@@ -307,8 +307,8 @@ function stepHTML(s) {
       </div>
       <span class="step-text${s.done ? ' done' : ''}" data-id="${s.id}" title="Doble clic para editar">${s.text}</span>
       <div class="step-labels">
-        <button class="step-label-btn label-importante${labels.includes('Urgente') ? ' active' : ''}" data-id="${s.id}" data-label="importante" title="Urgente">Importante</button>
-        <button class="step-label-btn label-inminente${labels.includes('importante') ? ' active' : ''}" data-id="${s.id}" data-label="inminente" title="Importante">Inminente</button>
+        <button class="step-label-btn label-importante${labels.includes('importante') ? ' active' : ''}" data-id="${s.id}" data-label="importante" title="Importante">Importante</button>
+        <button class="step-label-btn label-inminente${labels.includes('inminente') ? ' active' : ''}" data-id="${s.id}" data-label="inminente" title="Inminente">Inminente</button>
         <button class="step-label-btn label-sinprisa${labels.includes('sinprisa') ? ' active' : ''}" data-id="${s.id}" data-label="sinprisa" title="Sin prisa">Sin prisa</button>
       </div>
     </div>`;
