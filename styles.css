@@ -385,7 +385,7 @@ img, svg { display: block; }
 /* ── Columns ───────────────────────────────────────────── */
 .project-columns {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 3fr 2fr;
   padding: 28px 40px 48px;
   gap: 0;
 }
@@ -463,20 +463,41 @@ img, svg { display: block; }
 .tomorrow-add-btn:hover,
 .btn-ghost:hover { background: var(--bg-hover); color: var(--text-1); }
 
-/* ── Steps / Tomorrow lists ────────────────────────────── */
-.steps-list, .tomorrow-list { display: flex; flex-direction: column; gap: 0; }
+/* ── Steps grid (cards) ────────────────────────────────── */
+.steps-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
 
-.step-row, .tomorrow-row {
+.step-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 10px 8px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  transition: box-shadow var(--transition), border-color var(--transition);
+  position: relative;
+  cursor: default;
+}
+.step-row:hover {
+  box-shadow: var(--shadow-sm);
+  border-color: #d4d4d1;
+  background: var(--bg-card);
+}
+.step-row.step-done-row {
+  background: var(--bg-sidebar);
+  border-color: var(--border-light);
+}
+
+/* Top row inside card: checkbox + delete */
+.step-card-top {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 7px 4px;
-  border-radius: var(--radius-sm);
-  border-bottom: 1px solid var(--border-light);
-  transition: background var(--transition);
+  justify-content: space-between;
 }
-.step-row:last-child, .tomorrow-row:last-child { border-bottom: none; }
-.step-row:hover, .tomorrow-row:hover { background: var(--bg-hover); }
 
 .step-checkbox {
   width: 16px;
@@ -506,14 +527,109 @@ img, svg { display: block; }
   transform: rotate(-45deg) translate(1px, -1px);
 }
 
-.step-text, .tomorrow-text {
-  flex: 1;
-  font-size: 13.5px;
+.step-text {
+  font-size: 13px;
   color: var(--text-1);
+  line-height: 1.4;
+  word-break: break-word;
+  flex: 1;
 }
 .step-text.done { text-decoration: line-through; color: var(--text-3); }
 
-.step-delete, .tomorrow-delete {
+.step-delete {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--text-3);
+  opacity: 0;
+  transition: opacity var(--transition), background var(--transition), color var(--transition);
+}
+.step-row:hover .step-delete { opacity: 1; }
+.step-delete:hover {
+  color: #e03e3e;
+  background: rgba(224,62,62,.08);
+}
+
+/* Label pills on step cards */
+.step-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+.step-label-btn {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  transition: opacity var(--transition), background var(--transition);
+  letter-spacing: .02em;
+  line-height: 1.4;
+}
+.step-label-btn.label-importante {
+  background: rgba(224,62,62,.10);
+  color: #c0392b;
+  border-color: rgba(224,62,62,.22);
+}
+.step-label-btn.label-importante.active {
+  background: #e03e3e;
+  color: #fff;
+  border-color: #e03e3e;
+}
+.step-label-btn.label-sinprisa {
+  background: rgba(52,199,89,.10);
+  color: #1a7a3c;
+  border-color: rgba(52,199,89,.22);
+}
+.step-label-btn.label-sinprisa.active {
+  background: #34c759;
+  color: #fff;
+  border-color: #34c759;
+}
+.step-label-btn.label-inminente {
+  background: rgba(255,149,0,.10);
+  color: #b35900;
+  border-color: rgba(255,149,0,.22);
+}
+.step-label-btn.label-inminente.active {
+  background: #ff9500;
+  color: #fff;
+  border-color: #ff9500;
+}
+
+/* Section divider between pending / done */
+.steps-done-divider {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text-3);
+  padding: 16px 0 6px;
+  grid-column: 1 / -1;
+}
+
+/* Tomorrow list stays as-is */
+.tomorrow-list { display: flex; flex-direction: column; gap: 0; }
+.tomorrow-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 4px;
+  border-radius: var(--radius-sm);
+  border-bottom: 1px solid var(--border-light);
+  transition: background var(--transition);
+}
+.tomorrow-row:last-child { border-bottom: none; }
+.tomorrow-row:hover { background: var(--bg-hover); }
+.tomorrow-text { flex: 1; font-size: 13.5px; color: var(--text-1); }
+.tomorrow-delete {
   flex-shrink: 0;
   width: 20px;
   height: 20px;
@@ -526,21 +642,8 @@ img, svg { display: block; }
   opacity: 0;
   transition: opacity var(--transition), background var(--transition), color var(--transition);
 }
-.step-row:hover .step-delete,
 .tomorrow-row:hover .tomorrow-delete { opacity: 1; }
-.step-delete:hover, .tomorrow-delete:hover {
-  color: #e03e3e;
-  background: rgba(224,62,62,.08);
-}
-
-.steps-done-divider {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  color: var(--text-3);
-  padding: 12px 4px 4px;
-}
+.tomorrow-delete:hover { color: #e03e3e; background: rgba(224,62,62,.08); }
 
 .tomorrow-bullet {
   width: 5px; height: 5px;
@@ -876,20 +979,12 @@ img, svg { display: block; }
   margin-bottom: 8px;
 }
 
-/* ── Drag handle en steps ── */
+/* ── Drag handle en steps (cards) ── */
 .step-drag-handle {
-  flex-shrink: 0;
-  font-size: 14px;
-  color: var(--text-3);
-  opacity: 0;
-  cursor: grab;
-  user-select: none;
-  transition: opacity var(--transition);
-  line-height: 1;
+  display: none;
 }
-.step-row:hover .step-drag-handle { opacity: 1; }
 .step-row.dragging { opacity: .4; }
-.step-row.drag-over { background: var(--accent-soft); border-radius: var(--radius-sm); }
+.step-row.drag-over { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
 
 /* ── Inline edit input en steps ── */
 .step-edit-input {

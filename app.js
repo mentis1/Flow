@@ -209,6 +209,9 @@ function renderSteps(p) {
   list.querySelectorAll('.step-delete').forEach(btn => {
     btn.addEventListener('click', () => deleteStep(btn.dataset.id));
   });
+  list.querySelectorAll('.step-label-btn').forEach(btn => {
+    btn.addEventListener('click', () => toggleStepLabel(btn.dataset.id, btn.dataset.label));
+  });
 
   // Inline edit on double-click
   list.querySelectorAll('.step-text').forEach(span => {
@@ -295,12 +298,19 @@ function setupStepDragDrop(list, p) {
 }
 
 function stepHTML(s) {
+  const labels = s.labels || [];
   return `
     <div class="step-row${s.done ? ' step-done-row' : ''}" data-step-id="${s.id}" draggable="true">
-      <span class="step-drag-handle" title="Arrastrar">⠿</span>
-      <div class="step-checkbox${s.done ? ' checked' : ''}" data-id="${s.id}"></div>
+      <div class="step-card-top">
+        <div class="step-checkbox${s.done ? ' checked' : ''}" data-id="${s.id}"></div>
+        <button class="step-delete" data-id="${s.id}" title="Eliminar">✕</button>
+      </div>
       <span class="step-text${s.done ? ' done' : ''}" data-id="${s.id}" title="Doble clic para editar">${s.text}</span>
-      <button class="step-delete" data-id="${s.id}" title="Eliminar">✕</button>
+      <div class="step-labels">
+        <button class="step-label-btn label-importante${labels.includes('importante') ? ' active' : ''}" data-id="${s.id}" data-label="importante" title="Importante">Importante</button>
+        <button class="step-label-btn label-inminente${labels.includes('inminente') ? ' active' : ''}" data-id="${s.id}" data-label="inminente" title="Inminente">Inminente</button>
+        <button class="step-label-btn label-sinprisa${labels.includes('sinprisa') ? ' active' : ''}" data-id="${s.id}" data-label="sinprisa" title="Sin prisa">Sin prisa</button>
+      </div>
     </div>`;
 }
 
@@ -351,6 +361,18 @@ async function deleteStep(stepId) {
   const p = getProject(state.activeProjectId);
   if (!p) return;
   p.steps = (p.steps || []).filter(s => s.id !== stepId);
+  await saveProject(p);
+}
+
+async function toggleStepLabel(stepId, label) {
+  const p = getProject(state.activeProjectId);
+  if (!p) return;
+  p.steps = (p.steps || []).map(s => {
+    if (s.id !== stepId) return s;
+    const labels = s.labels || [];
+    const hasLabel = labels.includes(label);
+    return { ...s, labels: hasLabel ? labels.filter(l => l !== label) : [...labels, label] };
+  });
   await saveProject(p);
 }
 
@@ -621,7 +643,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!text) return;
     const p = getProject(state.activeProjectId);
     if (!p) return;
-    p.steps = [...(p.steps || []), { id: uid(), text, done: false }];
+    p.steps = [...(p.steps || []), { id: uid(), text, done: false, labels: [] }];
     await saveProject(p);
     input.value = '';
   });
