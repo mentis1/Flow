@@ -15,7 +15,6 @@ import {
   getFirestore,
   collection,
   doc,
-  getDocs,
   setDoc,
   deleteDoc,
   onSnapshot,
@@ -34,11 +33,11 @@ const firebaseConfig = {
 };
 
 const firebaseApp = initializeApp(firebaseConfig);
-const auth        = getAuth(firebaseApp);
-const db          = getFirestore(firebaseApp);
+const auth = getAuth(firebaseApp);
+const db = getFirestore(firebaseApp);
 
 // ── Constantes ───────────────────────────────────────────────
-const COLORS        = ['#ff3b30','#ff9500','#ffcc00','#34c759','#007aff','#5856d6','#af52de','#ff2d55','#636366'];
+const COLORS = ['#ff3b30','#ff9500','#ffcc00','#34c759','#007aff','#5856d6','#af52de','#ff2d55','#636366'];
 const EMOJIS_DEFAULT = ['🚀','💡','📊','🎯','💻','📚','💼','📹','🔥'];
 
 // ── Estado ───────────────────────────────────────────────────
@@ -102,10 +101,10 @@ function applyProgressZone(fill, value) {
   if (!fill) return;
   const v = Number(value);
   let color;
-  if (v === 100)      color = '#0f9d58';
-  else if (v >= 65)   color = '#2383e2';
-  else if (v >= 35)   color = '#dfab01';
-  else                color = '#e03e3e';
+  if (v === 100) color = '#0f9d58';
+  else if (v >= 65) color = '#2383e2';
+  else if (v >= 35) color = '#dfab01';
+  else color = '#e03e3e';
   fill.style.background = color;
   fill.style.backgroundImage = 'none';
 }
@@ -192,7 +191,10 @@ function renderProjectView() {
 function renderSteps(p) {
   const list = document.getElementById('stepsList');
   const steps = p.steps || [];
-  if (!steps.length) { list.innerHTML = '<div style="color:var(--text-3);font-size:13px;padding:8px 4px">Sin pasos todavía.</div>'; return; }
+  if (!steps.length) {
+    list.innerHTML = '<div style="color:var(--text-3);font-size:13px;padding:8px 4px">Sin pasos todavía.</div>';
+    return;
+  }
 
   const pending = steps.filter(s => !s.done);
   const done    = steps.filter(s => s.done);
@@ -213,12 +215,10 @@ function renderSteps(p) {
     btn.addEventListener('click', () => toggleStepLabel(btn.dataset.id, btn.dataset.label));
   });
 
-  // Inline edit on double-click
   list.querySelectorAll('.step-text').forEach(span => {
     span.addEventListener('dblclick', () => startEditStep(span));
   });
 
-  // Drag-to-reorder
   setupStepDragDrop(list, p);
 }
 
@@ -241,7 +241,6 @@ function startEditStep(span) {
       p.steps = (p.steps || []).map(s => s.id === stepId ? { ...s, text: newText } : s);
       await saveProject(p);
     } else {
-      // Revert without saving
       const newSpan = document.createElement('span');
       newSpan.className = span.className;
       newSpan.dataset.id = stepId;
@@ -317,7 +316,10 @@ function stepHTML(s) {
 function renderTomorrow(p) {
   const list = document.getElementById('tomorrowList');
   const items = p.tomorrow || [];
-  if (!items.length) { list.innerHTML = '<div style="color:var(--text-3);font-size:13px;padding:8px 4px">Sin acciones para mañana.</div>'; return; }
+  if (!items.length) {
+    list.innerHTML = '<div style="color:var(--text-3);font-size:13px;padding:8px 4px">Sin acciones para mañana.</div>';
+    return;
+  }
   list.innerHTML = items.map(t => `
     <div class="tomorrow-row">
       <span class="tomorrow-bullet"></span>
@@ -564,20 +566,24 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ── Exportar todo (sidebar) ──
-document.getElementById('btnExportAll').addEventListener('click', () => {
-  if (!state.projects.length) { showToast('No hay proyectos para exportar.'); return; }
+  document.getElementById('btnExportAll').addEventListener('click', () => {
+    if (!state.projects.length) { showToast('No hay proyectos para exportar.'); return; }
 
-  const sections = state.projects.map(p => {
-    const pending = (p.steps || [])
-      .filter(s => !s.done)
-      .map(s => `- [ ] ${s.text}`)
-      .join('\n') || '- [ ] Sin acciones';
+    const sections = state.projects.map(p => {
+      const actions = (p.tomorrow || [])
+        .map(t => `- [ ] ${t.text}`)
+        .join('\n') || '- [ ] Sin acciones';
 
-    return `${p.emoji} ${p.name}\n\n${pending}`;
-  }).join('\n\n---\n\n');
+      return `${p.emoji} ${p.name}\n\n${actions}`;
+    }).join('\n\n---\n\n');
 
-  navigator.clipboard.writeText(sections).then(() => showToast('Todos los proyectos copiados ✓'));
-});
+    navigator.clipboard.writeText(sections)
+      .then(() => showToast('Todos los proyectos copiados ✓'))
+      .catch(err => {
+        console.error('Error al copiar todos los proyectos:', err);
+        showToast('No se pudo copiar al portapapeles.');
+      });
+  });
 
   // ── Editar / Eliminar proyecto ──
   document.getElementById('btnEditProject').addEventListener('click', () => {
@@ -610,9 +616,14 @@ document.getElementById('btnExportAll').addEventListener('click', () => {
       showToast('Proyecto actualizado.');
     } else {
       const newProject = {
-        id: uid(), name, desc,
-        emoji: _selectedEmoji, color: _selectedColor,
-        progress: 0, steps: [], tomorrow: [],
+        id: uid(),
+        name,
+        desc,
+        emoji: _selectedEmoji,
+        color: _selectedColor,
+        progress: 0,
+        steps: [],
+        tomorrow: [],
         createdAt: Date.now()
       };
       await saveProject(newProject);
@@ -661,43 +672,48 @@ document.getElementById('btnExportAll').addEventListener('click', () => {
   });
 
   // ── Exportar día ──
-// ── Exportar día ──
-document.getElementById('btnExport').addEventListener('click', async () => {
-  const p = getProject(state.activeProjectId);
-  if (!p) return;
+  document.getElementById('btnExport').addEventListener('click', async () => {
+    const p = getProject(state.activeProjectId);
+    if (!p) return;
 
-  const pending = (p.steps || [])
-    .filter(s => !s.done)
-    .map(s => `- [ ] ${s.text}`)
-    .join('\n') || '- [ ] Sin acciones';
+    const actions = (p.tomorrow || [])
+      .map(t => `- [ ] ${t.text}`)
+      .join('\n') || '- [ ] Sin acciones';
 
-  const text = `${p.emoji} ${p.name}\n\n${pending}`;
-  navigator.clipboard.writeText(text).then(() => {
-    showToast('Resumen copiado al portapapeles ✓');
+    const text = `${p.emoji} ${p.name}\n\n${actions}`;
+
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast('Resumen copiado al portapapeles ✓');
+    } catch (err) {
+      console.error('Error al copiar:', err);
+      showToast('No se pudo copiar al portapapeles.');
+      return;
+    }
+
+    const newSteps = (p.tomorrow || []).map(t => ({
+      id: uid(),
+      text: t.text,
+      done: false,
+      labels: []
+    }));
+
+    p.steps = [...(p.steps || []), ...newSteps];
+    p.tomorrow = [];
+    await saveProject(p);
   });
-
-  const newSteps = (p.tomorrow || []).map(t => ({
-    id: uid(),
-    text: t.text,
-    done: false
-  }));
-
-  p.steps = [...(p.steps || []), ...newSteps];
-  p.tomorrow = [];
-  await saveProject(p);
-});
 });
 
 // ── Mensajes de error amigables ──────────────────────────────
 function friendlyError(code) {
   const map = {
-    'auth/user-not-found':      'No existe ninguna cuenta con ese correo.',
-    'auth/wrong-password':      'Contraseña incorrecta.',
-    'auth/invalid-email':       'El correo no es válido.',
-    'auth/email-already-in-use':'Ya existe una cuenta con ese correo.',
-    'auth/weak-password':       'La contraseña debe tener al menos 6 caracteres.',
-    'auth/too-many-requests':   'Demasiados intentos fallidos. Inténtalo más tarde.',
-    'auth/invalid-credential':  'Correo o contraseña incorrectos.',
+    'auth/user-not-found':       'No existe ninguna cuenta con ese correo.',
+    'auth/wrong-password':       'Contraseña incorrecta.',
+    'auth/invalid-email':        'El correo no es válido.',
+    'auth/email-already-in-use': 'Ya existe una cuenta con ese correo.',
+    'auth/weak-password':        'La contraseña debe tener al menos 6 caracteres.',
+    'auth/too-many-requests':    'Demasiados intentos fallidos. Inténtalo más tarde.',
+    'auth/invalid-credential':   'Correo o contraseña incorrectos.',
   };
   return map[code] || 'Error al autenticar. Inténtalo de nuevo.';
 }
