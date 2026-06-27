@@ -564,21 +564,20 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ── Exportar todo (sidebar) ──
-  document.getElementById('btnExportAll').addEventListener('click', () => {
-    if (!state.projects.length) { showToast('No hay proyectos para exportar.'); return; }
-    const date = formatDateES();
-    const sections = state.projects.map(p => {
-      const pending = (p.steps || []).filter(s => !s.done).map(s => `  - [ ] ${s.text}`).join('\n') || '  (sin pasos pendientes)';
-      const done    = (p.steps || []).filter(s => s.done).map(s => `  - [x] ${s.text}`).join('\n');
-      const tmrw    = (p.tomorrow || []).map(t => `  - ${t.text}`).join('\n');
-      let section = `## ${p.emoji} ${p.name} — ${p.progress ?? 0}%\n### Pasos pendientes\n${pending}`;
-      if (done) section += `\n### Completados\n${done}`;
-      if (tmrw) section += `\n### Acciones para mañana\n${tmrw}`;
-      return section;
-    }).join('\n\n---\n\n');
-    const text = `# 📋 Exportación completa — ${date}\n\n${sections}`;
-    navigator.clipboard.writeText(text).then(() => showToast('Todos los proyectos copiados ✓'));
-  });
+document.getElementById('btnExportAll').addEventListener('click', () => {
+  if (!state.projects.length) { showToast('No hay proyectos para exportar.'); return; }
+
+  const sections = state.projects.map(p => {
+    const pending = (p.steps || [])
+      .filter(s => !s.done)
+      .map(s => `- [ ] ${s.text}`)
+      .join('\n') || '- [ ] Sin acciones';
+
+    return `${p.emoji} ${p.name}\n\n${pending}`;
+  }).join('\n\n---\n\n');
+
+  navigator.clipboard.writeText(sections).then(() => showToast('Todos los proyectos copiados ✓'));
+});
 
   // ── Editar / Eliminar proyecto ──
   document.getElementById('btnEditProject').addEventListener('click', () => {
@@ -662,22 +661,31 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ── Exportar día ──
-  document.getElementById('btnExport').addEventListener('click', async () => {
-    const p = getProject(state.activeProjectId);
-    if (!p) return;
-    const date    = formatDateES();
-    const pending = (p.steps || []).filter(s => !s.done).map(s => `- [ ] ${s.text}`).join('\n') || '  (sin pasos pendientes)';
-    const done    = (p.steps || []).filter(s => s.done).map(s => `- [x] ${s.text}`).join('\n') || '';
-    const tmrw    = (p.tomorrow || []).map(t => `- ${t.text}`).join('\n') || '  (sin acciones para mañana)';
-    const text    = `# ${p.emoji} ${p.name} — ${date}\nProgreso: ${p.progress ?? 0}%\n\n## Pasos pendientes\n${pending}\n${done ? `\n## Completados\n${done}` : ''}\n\n## Acciones para mañana\n${tmrw}`;
-    navigator.clipboard.writeText(text).then(() => showToast('Resumen copiado al portapapeles ✓'));
+// ── Exportar día ──
+document.getElementById('btnExport').addEventListener('click', async () => {
+  const p = getProject(state.activeProjectId);
+  if (!p) return;
 
-    // Mover acciones de mañana a pasos del proyecto (sin marcar)
-    const newSteps = (p.tomorrow || []).map(t => ({ id: uid(), text: t.text, done: false }));
-    p.steps = [...(p.steps || []), ...newSteps];
-    p.tomorrow = [];
-    await saveProject(p);
+  const pending = (p.steps || [])
+    .filter(s => !s.done)
+    .map(s => `- [ ] ${s.text}`)
+    .join('\n') || '- [ ] Sin acciones';
+
+  const text = `${p.emoji} ${p.name}\n\n${pending}`;
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('Resumen copiado al portapapeles ✓');
   });
+
+  const newSteps = (p.tomorrow || []).map(t => ({
+    id: uid(),
+    text: t.text,
+    done: false
+  }));
+
+  p.steps = [...(p.steps || []), ...newSteps];
+  p.tomorrow = [];
+  await saveProject(p);
+});
 });
 
 // ── Mensajes de error amigables ──────────────────────────────
